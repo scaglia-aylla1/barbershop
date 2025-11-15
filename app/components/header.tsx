@@ -1,20 +1,13 @@
 "use client";
 
 import { Button } from "@/app/components/ui/button";
-import { authClient } from "@/lib/auth-client";
 import { MenuIcon } from "lucide-react";
 import Image from "next/image";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import SidebarMenu from "./sidebar";
 
 const Header = () => {
-  const { data: session } = authClient.useSession();
-
-  const handleLogin = async () => {
-    await authClient.signIn.social({
-      provider: "google",
-    });
-  };
+ 
   return (
     <header className="flex items-center justify-between bg-white px-5 py-6">
       <Image src="/logo.svg" alt="Aparatus" width={100} height={26.09} />

@@ -14,6 +14,9 @@ import { Calendar } from "./ui/calendar";
 import { useState } from "react";
 import { ptBR } from "date-fns/locale";
 import { Separator } from "./ui/separator";
+import { useAction } from "next-safe-action/hooks";
+import { createBooking } from "../_actions/create-booking";
+import { toast } from "sonner";
 
 interface ServiceItemProps {
   service: BarbershopService & {
@@ -45,6 +48,8 @@ const TIME_SLOTS = [
 const ServiceItem = ({ service }: ServiceItemProps) => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState<string | undefined>();
+  const { executeAsync, isPending} = useAction(createBooking);
+  const [sheetIsOpen, setSheetIsOpen] = useState(false);
 
   const priceInReais = (service.priceInCents / 100).toLocaleString("pt-BR", {
     style: "currency",
@@ -65,38 +70,63 @@ const ServiceItem = ({ service }: ServiceItemProps) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const handleConfirm = async () => {
+    // 10:00
+    if (!selectedTime || !selectedDate) {
+      return;
+    }
+    const timeSplitted = selectedTime.split(":"); // [10, 00]
+    const hours = timeSplitted[0];
+    const minutes = timeSplitted[1];
+    const date = new Date(selectedDate);
+    date.setHours(Number(hours), Number(minutes));
+
+    const result = await executeAsync({
+      serviceId: service.id,
+      date,
+    });
+    if (result.serverError || result.validationErrors) {
+      toast.error(result.validationErrors?._errors?.[0]);
+      return;
+    }
+    toast.success("Agendamento criado com sucesso!");
+    setSelectedDate(undefined);
+    setSelectedTime(undefined);
+    setSheetIsOpen(false);
+  };
+
   return (
-    <Sheet>
+    <Sheet  open={sheetIsOpen} onOpenChange={setSheetIsOpen}>
       <div className="border-border bg-card flex items-center justify-center gap-3 rounded-2xl border border-solid p-3">
-        <div className="relative size-[110px] shrink-0 overflow-hidden rounded-[10px]">
-          <Image
-            src={service.imageUrl}
-            alt={service.name}
-            fill
-            className="object-cover"
-          />
-        </div>
-        <div className="flex grow basis-0 flex-row items-center self-stretch">
-          <div className="relative flex h-full min-h-0 min-w-0 grow basis-0 flex-col items-start justify-between">
-            <div className="flex h-[67.5px] w-full flex-col items-start gap-1 text-sm leading-[1.4]">
-              <p className="text-card-foreground w-full font-bold">
-                {service.name}
-              </p>
-              <p className="text-muted-foreground w-full font-normal">
-                {service.description}
-              </p>
-            </div>
-            <div className="flex w-full items-center justify-between">
-              <p className="text-card-foreground text-sm leading-[1.4] font-bold whitespace-pre">
-                {priceInReais}
-              </p>
-              <SheetTrigger asChild>
+      <div className="relative size-[110px] shrink-0 overflow-hidden rounded-[10px]">
+        <Image
+          src={service.imageUrl}
+          alt={service.name}
+          fill
+          className="object-cover"
+        />
+      </div>
+      <div className="flex grow basis-0 flex-row items-center self-stretch">
+        <div className="relative flex h-full min-h-0 min-w-0 grow basis-0 flex-col items-start justify-between">
+          <div className="flex h-[67.5px] w-full flex-col items-start gap-1 text-sm leading-[1.4]">
+            <p className="text-card-foreground w-full font-bold">
+              {service.name}
+            </p>
+            <p className="text-muted-foreground w-full font-normal">
+              {service.description}
+            </p>
+          </div>
+          <div className="flex w-full items-center justify-between">
+            <p className="text-card-foreground text-sm leading-[1.4] font-bold whitespace-pre">
+              {priceInReais}
+            </p>
+            <SheetTrigger asChild>
                 <Button className="rounded-full px-4 py-2">Reservar</Button>
               </SheetTrigger>
-            </div>
           </div>
         </div>
       </div>
+    </div>
       <SheetContent className="w-[370px] overflow-y-auto p-0">
         <div className="flex h-full flex-col gap-6">
           <SheetHeader className="px-5 pt-6">
@@ -166,7 +196,8 @@ const ServiceItem = ({ service }: ServiceItemProps) => {
               <div className="px-5 pb-6">
                 <Button
                   className="w-full rounded-full"
-                  disabled={isConfirmDisabled}
+                  disabled={isConfirmDisabled || isPending}
+                  onClick={handleConfirm}
                 >
                   Confirmar
                 </Button>
